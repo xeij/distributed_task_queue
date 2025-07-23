@@ -1,6 +1,6 @@
 //! Task scheduler for managing scheduled and periodic tasks
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Datelike, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -334,34 +334,36 @@ impl TaskScheduler {
                 .collect::<Vec<_>>()
         };
         
-        for mut job in ready_jobs {
-            debug!("Executing scheduled job: {} ({})", job.name, job.id);
-            
-            // Submit the task
-            let result = self.execute_job(&job).await;
-            
-            // Update job status
-            job.mark_executed(result.is_ok());
-            
-            // Update the job in the collection
-            {
-                let mut jobs = self.jobs.write().await;
-                if job.enabled || job.schedule.is_recurring() {
-                    jobs.insert(job.id, job);
-                } else {
-                    jobs.remove(&job.id);
-                }
-            }
-            
-            match result {
-                Ok(task_id) => {
-                    info!("Scheduled job {} submitted successfully (task: {})", job.name, task_id);
-                }
-                Err(e) => {
-                    error!("Failed to execute scheduled job {}: {}", job.name, e);
-                }
-            }
-        }
+                 for mut job in ready_jobs {
+             debug!("Executing scheduled job: {} ({})", job.name, job.id);
+             
+             // Submit the task
+             let result = self.execute_job(&job).await;
+             let job_name = job.name.clone();
+             let job_id = job.id;
+             
+             // Update job status
+             job.mark_executed(result.is_ok());
+             
+             // Update the job in the collection
+             {
+                 let mut jobs = self.jobs.write().await;
+                 if job.enabled || job.schedule.is_recurring() {
+                     jobs.insert(job_id, job);
+                 } else {
+                     jobs.remove(&job_id);
+                 }
+             }
+             
+             match result {
+                 Ok(task_id) => {
+                     info!("Scheduled job {} submitted successfully (task: {})", job_name, task_id);
+                 }
+                 Err(e) => {
+                     error!("Failed to execute scheduled job {}: {}", job_name, e);
+                 }
+             }
+         }
         
         Ok(())
     }
